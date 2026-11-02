@@ -257,6 +257,14 @@ int background_gravity_functions_smg(
   pvecback[pba->index_bg_M2_running_prime_smg] = 0.;
   pvecback[pba->index_bg_tensor_excess_prime_smg] = 0.;
   pvecback[pba->index_bg_beyond_horndeski_prime_smg] = 0.;
+  /* These two columns only exist for covariant models. They must be set too:
+     otherwise uninitialized memory is stored in the background table, and the
+     spline of the table propagates it (NaN) to every line, which randomly
+     triggers the NaN check in background_solve_smg (seen with brans_dicke). */
+  if (pba->field_evolution_smg == _TRUE_) {
+    pvecback[pba->index_bg_braiding_over_phi_prime_smg] = 0.;
+    pvecback[pba->index_bg_beyond_horndeski_over_phi_prime_smg] = 0.;
+  }
   pvecback[pba->index_bg_H_prime_prime] = 0.;
   pvecback[pba->index_bg_p_tot_wo_prime_smg] = 0.;
   pvecback[pba->index_bg_p_prime_smg] = 0.;
@@ -330,7 +338,9 @@ int background_gravity_functions_smg(
   pvecback[pba->index_bg_lambda_11_prime_smg] = 0.;
   pvecback[pba->index_bg_G_eff_smg] = 0.;
   pvecback[pba->index_bg_slip_eff_smg] = 0.;
-  if (pba->field_evolution_smg == _FALSE_ && pba->M2_evolution_smg == _FALSE_){
+  /* alphas_table provides alpha_M consistently with M2 (Hermite interpolant): keep it */
+  if (pba->field_evolution_smg == _FALSE_ && pba->M2_evolution_smg == _FALSE_
+      && pba->gravity_model_smg != alphas_table){
     pvecback[pba->index_bg_M2_running_smg] = 0.;
   }
 
@@ -382,6 +392,17 @@ int background_free_smg(
 	//dealocate parameters_2_smg only for parameterizations
 	if (pba->field_evolution_smg == _FALSE_ && pba->parameters_2_smg != NULL)
 	  free(pba->parameters_2_smg);
+
+	if (pba->alphas_table_smg != NULL) {
+	  tables_smg_free_alphas(pba->alphas_table_smg);
+	  free(pba->alphas_table_smg);
+	  pba->alphas_table_smg = NULL;
+	}
+	if (pba->expansion_table_smg != NULL) {
+	  tables_smg_free_expansion(pba->expansion_table_smg);
+	  free(pba->expansion_table_smg);
+	  pba->expansion_table_smg = NULL;
+	}
 
 	return _SUCCESS_;
 }
@@ -1362,7 +1383,9 @@ int derivatives_alphas_smg(
 	// Only need to compute it if neither self consistent field evolution nor evolving M2 in terms of alpha_M
 	// check equation 3.3 of Bellini & Sawicki 2014
 
-	if (pba->field_evolution_smg == _FALSE_ && pba->M2_evolution_smg == _FALSE_){
+	/* not for alphas_table, whose alpha_M is exact (see background_functions_smg) */
+	if (pba->field_evolution_smg == _FALSE_ && pba->M2_evolution_smg == _FALSE_
+	    && pba->gravity_model_smg != alphas_table){
 		double alpha_M = pvecback_derivs[pba->index_bg_delta_M2_smg]/pvecback[pba->index_bg_M2_smg];
 		copy_to_background_table_smg(pba, i, pba->index_bg_M2_running_smg, alpha_M);
 	}

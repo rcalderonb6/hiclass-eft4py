@@ -103,7 +103,7 @@ vpath %.c $(HI_CLASS_PATH)
 CCFLAG += -DHI_CLASS_PATH
 #LDFLAGS += -DHI_CLASS_PATH
 INCLUDES += -I../gravity_smg/include
-EXTERNAL += input_smg.o background_smg.o perturbations_smg.o gravity_functions_smg.o gravity_models_smg.o hmcode_smg.o
+EXTERNAL += input_smg.o background_smg.o perturbations_smg.o gravity_functions_smg.o gravity_models_smg.o hmcode_smg.o tables_smg.o
 endif
 
 vpath %.c $(HALOFIT)

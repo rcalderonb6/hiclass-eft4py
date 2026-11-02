@@ -13,6 +13,7 @@ cdef extern from "class.h":
     const char * _HI_CLASS_VERSION_
 
     ctypedef char FileArg[40]
+    enum: _ARGUMENT_LENGTH_MAX_
 
     ctypedef char* ErrorMsg
 

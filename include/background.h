@@ -24,7 +24,8 @@ enum gravity_model {propto_omega, propto_omega_bh, propto_scale,
     brans_dicke,
     quintessence_monomial, quintessence_tracker,
     alpha_attractor_canonical,
-    cccg_exp
+    cccg_exp,
+    alphas_table
 };
 
 /** model subclasses (_smg), e.g. branches of the conformally coupled cubic galileon */
@@ -33,7 +34,13 @@ enum gravity_submodel {unspecified, cccg_exp_normal, cccg_exp_canonical};
 
 /** parameterized expansion, only for non-self consistent Horndeski theories (_smg) */
 
-enum expansion_model {lcdm, wowa, wowa_w, wede};
+enum expansion_model {lcdm, wowa, wowa_w, wede, table};
+
+/** tabulated inputs for gravity_model = alphas_table and expansion_model = table (_smg),
+    defined in gravity_smg/include/tables_smg.h */
+
+struct alphas_table_smg;
+struct expansion_table_smg;
 
 /** list of possible parametrizations of the varying fundamental constants */
 
@@ -208,6 +215,9 @@ struct background
 
   double * parameters_2_smg;  /**< list of auxiliary parameters describing the modified gravity model */
   int parameters_2_size_smg; /**< size of parameters_smg */
+
+  struct alphas_table_smg * alphas_table_smg;       /**< tabulated alphas (gravity_model = alphas_table), else NULL */
+  struct expansion_table_smg * expansion_table_smg; /**< tabulated expansion (expansion_model = table), else NULL */
 
   int M2_tuning_smg; /**< whether we want secondary tuning for M2(today) */
   int tuning_index_2_smg;     /**< index in scf_parameters used for tuning (the Planck mass) */
