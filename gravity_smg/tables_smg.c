@@ -268,6 +268,7 @@ static int tables_smg_init_table(struct table_smg * ptab,
   class_alloc(ptab->ddy, n*ncol*sizeof(double), errmsg);
   class_alloc(ptab->is_log, ncol*sizeof(short), errmsg);
   class_alloc(ptab->extrap_slope, ncol*sizeof(double), errmsg);
+  class_alloc(ptab->sign, ncol*sizeof(short), errmsg);
 
   for (i = 0; i < n; i++) {
     ptab->lna[i] = lna[i];
@@ -275,6 +276,12 @@ static int tables_smg_init_table(struct table_smg * ptab,
       ptab->y[i*ncol+j] = cols[j][i];
   }
   for (j = 0; j < ncol; j++) {
+    short nonneg = _TRUE_, nonpos = _TRUE_;
+    for (i = 0; i < n; i++) {
+      if (cols[j][i] < 0.) nonneg = _FALSE_;
+      if (cols[j][i] > 0.) nonpos = _FALSE_;
+    }
+    ptab->sign[j] = (is_log[j] == _TRUE_) ? 0 : (nonneg == _TRUE_ ? 1 : (nonpos == _TRUE_ ? -1 : 0));
     ptab->is_log[j] = is_log[j];
     ptab->extrap_slope[j] = tables_smg_tail_slope(lna[0], cols[j][0], lna[1], cols[j][1],
                                                   is_log[j], constant_tail);
@@ -292,6 +299,7 @@ static int tables_smg_free_table(struct table_smg * ptab) {
   free(ptab->ddy);
   free(ptab->is_log);
   free(ptab->extrap_slope);
+  free(ptab->sign);
   return _SUCCESS_;
 }
 
@@ -330,6 +338,10 @@ static int tables_smg_eval_table(struct table_smg * ptab,
   class_call(array_interpolate_spline(ptab->lna, ptab->n, ptab->y, ptab->ddy, ptab->ncol,
                                       lna, &last_index, result, ptab->ncol, errmsg),
              errmsg, errmsg);
+  for (j = 0; j < ptab->ncol; j++) {
+    if (ptab->sign[j] > 0) result[j] = MAX(result[j], 0.);
+    if (ptab->sign[j] < 0) result[j] = MIN(result[j], 0.);
+  }
   if (dresult != NULL) {
     class_call(array_derivate_spline(ptab->lna, ptab->n, ptab->y, ptab->ddy, ptab->ncol,
                                      lna, &last_index, dresult, ptab->ncol, errmsg),

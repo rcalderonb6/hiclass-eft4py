@@ -64,6 +64,9 @@ struct table_smg {
   double * ddy;          /**< spline second derivatives, same layout */
   short * is_log;        /**< column j is a logarithm: extrapolated linearly instead of as a power law */
   double * extrap_slope; /**< below the first node: d y_j/d ln a if is_log[j], else d ln|y_j|/d ln a (0 = constant) */
+  short * sign;          /**< +1 (-1) if column j is >= 0 (<= 0) at every node, else 0: interpolated values
+                              keep that sign, so spline ringing next to zeros (e.g. alpha_K of a field
+                              starting at rest) cannot fake a ghost or gradient instability */
 };
 
 /** Extrapolation settings, shared by both tables. */
