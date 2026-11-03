@@ -428,6 +428,14 @@ int input_read_from_file(struct file_content * pfc,
   // Init local variable for tuned_smg, otherwise later it is overwritten
   short parameters_tuned_smg = pba->parameters_tuned_smg;
 
+  /* The shooting status must survive input_read_parameters too: it calls
+     input_default_params -> input_default_params_smg, which resets
+     pba->shooting_failed to _FALSE_. Without restoring it, a failed shooting
+     is silently accepted and the run returns a wrong (untuned) cosmology. */
+  short shooting_failed = pba->shooting_failed;
+  ErrorMsg shooting_error;
+  memcpy(shooting_error, pba->shooting_error, sizeof(ErrorMsg));
+
   /** Update structs with input that is potentially updated after shooting */
   class_call(input_read_parameters(pfc,ppr,pba,pth,ppt,ptr,ppm,phr,pfo,ple,psd,pop,
                                     errmsg),
@@ -437,6 +445,10 @@ int input_read_from_file(struct file_content * pfc,
   // Reassign the right value to pba->parameters_tuned_smg,
   // since it is potentially updated by input_read_parameters
   pba->parameters_tuned_smg = parameters_tuned_smg;
+
+  // Restore the shooting status (see above)
+  pba->shooting_failed = shooting_failed;
+  memcpy(pba->shooting_error, shooting_error, sizeof(ErrorMsg));
 
   if (has_shooting == _TRUE_ && pba->shooting_failed == _TRUE_) {
     // Shooting failed, but error must be thrown in background in order to trigger a
@@ -916,6 +928,17 @@ int input_needs_shooting_for_target(struct file_content * pfc,
     case Omega_smg:
       if (target_value == 0.)
         *needs_shooting = _FALSE_;
+      else {
+        /* expansion_model = table rescales the tabulated rho_smg by
+           Omega0_smg H0^2, so the budget closes without tuning anything */
+        FileArg string_tmp;
+        int flag_tmp;
+        class_call(parser_read_string(pfc,"expansion_model",&string_tmp,&flag_tmp,errmsg),
+                   errmsg,
+                   errmsg);
+        if ((flag_tmp == _TRUE_) && (strcmp(string_tmp,"table") == 0))
+          *needs_shooting = _FALSE_;
+      }
       break;
     case M2_today_smg:
       {

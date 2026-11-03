@@ -367,6 +367,10 @@ int input_default_params_smg(
 
   pba->parameters_smg = NULL;
   pba->parameters_size_smg = 0;
+  pba->parameters_2_smg = NULL;
+  pba->parameters_2_size_smg = 0;
+  pba->alphas_table_smg = NULL;
+  pba->expansion_table_smg = NULL;
   pba->tuning_index_smg = 0;
   pba->tuning_dxdy_guess_smg = 1;
 

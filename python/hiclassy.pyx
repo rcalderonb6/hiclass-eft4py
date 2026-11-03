@@ -84,6 +84,37 @@ class CosmoComputationError(CosmoError):
     pass
 
 
+def _format_parameter_value(value):
+    """Turn sequences and arrays into CLASS comma-separated lists.
+
+    Scalars and strings are returned unchanged. Each float is written with
+    `repr`, the shortest string that round-trips exactly, so no precision is
+    lost when tabulated inputs are passed as lists.
+    """
+    if isinstance(value, (str, bytes)):
+        return value
+    if isinstance(value, np.ndarray) or isinstance(value, (list, tuple)):
+        arr = np.asarray(value)
+        if arr.ndim == 0:
+            return value
+        if arr.ndim != 1:
+            raise CosmoSevereError("array parameter values must be one-dimensional")
+        return ",".join(repr(float(x)) for x in arr)
+    return value
+
+
+def _format_parameters(pars):
+    return {key: _format_parameter_value(val) for key, val in pars.items()}
+
+
+def _check_argument_length(name, encoded):
+    if len(encoded) >= _ARGUMENT_LENGTH_MAX_:
+        raise CosmoSevereError(
+            "parameter '%s' is %d characters long; CLASS accepts at most %d "
+            "(_ARGUMENT_LENGTH_MAX_ in include/parser.h). Pass long tables "
+            "through a table file instead." % (name, len(encoded), _ARGUMENT_LENGTH_MAX_ - 1))
+
+
 cdef class HiClass:
     """
     HiClass wrapping, creates the glue between C and python
@@ -370,10 +401,10 @@ cdef class HiClass:
     def set(self,*pars,**kars):
         oldpars = self._pars.copy()
         if len(pars)==1:
-            self._pars.update(dict(pars[0]))
+            self._pars.update(_format_parameters(dict(pars[0])))
         elif len(pars)!=0:
             raise CosmoSevereError("bad call")
-        self._pars.update(kars)
+        self._pars.update(_format_parameters(kars))
         if viewdictitems(self._pars) <= viewdictitems(oldpars):
           return # Don't change the computed states, if the new dict was already contained in the previous dict
         self.computed=False
@@ -408,11 +439,15 @@ cdef class HiClass:
         for kk in self._pars:
 
             dumcp = kk.strip().encode()
+            _check_argument_length(kk, dumcp)
             dumc = dumcp
-            sprintf(self.fc.name[i],"%s",dumc)
+            strncpy(self.fc.name[i], dumc, _ARGUMENT_LENGTH_MAX_ - 1)
+            self.fc.name[i][_ARGUMENT_LENGTH_MAX_ - 1] = 0
             dumcp = str(self._pars[kk]).strip().encode()
+            _check_argument_length(kk, dumcp)
             dumc = dumcp
-            sprintf(self.fc.value[i],"%s",dumc)
+            strncpy(self.fc.value[i], dumc, _ARGUMENT_LENGTH_MAX_ - 1)
+            self.fc.value[i][_ARGUMENT_LENGTH_MAX_ - 1] = 0
             self.fc.read[i] = _FALSE_
             i+=1
         if not 'base_path' in self._pars:

@@ -5,6 +5,7 @@
 #include "input.h"
 #include "background.h"
 #include "rootfinder.h"
+#include "tables_smg.h"
 
 /**
  * structure containing the G's and F's functions, for Horndeski

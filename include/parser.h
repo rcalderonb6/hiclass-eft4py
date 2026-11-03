@@ -4,7 +4,12 @@
 #include "common.h"
 
 #define _LINE_LENGTH_MAX_ 1024 /**< size of the string read in each line of the file (extra characters not taken into account) */
-#define _ARGUMENT_LENGTH_MAX_ 1024 /**< maximum size of each argument (name or value), including the final null character */
+/* _smg: raised from 1024 so that tabulated inputs (e.g. gravity_model = alphas_table,
+   expansion_model = table) can be passed as comma-separated lists from the Python
+   wrapper; 200000 characters hold ~8000 doubles at full precision. Lines read from
+   .ini files are still limited by _LINE_LENGTH_MAX_, so long tables in .ini files
+   must be given as table files instead. */
+#define _ARGUMENT_LENGTH_MAX_ 200000 /**< maximum size of each argument (name or value), including the final null character */
 
 typedef char FileArg[_ARGUMENT_LENGTH_MAX_];
 

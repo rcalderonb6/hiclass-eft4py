@@ -45,6 +45,21 @@ int gravity_models_gravity_properties_smg(
   *                        "expansion_smg" to pba->parameters_smg
   */
 
+  if (strcmp(string1,"alphas_table") == 0) {
+     /* tabulated alphas and M_*^2 (gravity_smg/tables_smg.c); M_*^2 is
+        interpolated, not integrated from alpha_M */
+     pba->gravity_model_smg = alphas_table;
+     pba->field_evolution_smg = _FALSE_;
+     pba->M2_evolution_smg = _FALSE_;
+     flag2=_TRUE_;
+     pba->parameters_2_size_smg = 0;
+     pba->parameters_2_smg = NULL;
+     class_alloc(pba->alphas_table_smg, sizeof(struct alphas_table_smg), errmsg);
+     class_call(tables_smg_read_alphas(pfc, pba->alphas_table_smg, errmsg),
+                errmsg,
+                errmsg);
+   }
+
   if (strcmp(string1,"propto_omega") == 0) {
      pba->gravity_model_smg = propto_omega;
      pba->field_evolution_smg = _FALSE_;
@@ -775,7 +790,7 @@ int gravity_models_gravity_properties_smg(
 
   class_test(flag2==_FALSE_,
              errmsg,
-             "could not identify gravity_theory value, check that it is one of 'propto_omega', 'propto_omega_bh', 'propto_scale', 'constant_alphas', 'eft_alphas_power_law', 'eft_gammas_power_law', 'eft_gammas_exponential', 'brans_dicke', 'galileon', 'glpv_galileon', 'cccg_exp', 'nKGB', 'quintessence_monomial', 'quintessence_tracker', 'alpha_attractor_canonical' ...");
+             "could not identify gravity_theory value, check that it is one of 'propto_omega', 'propto_omega_bh', 'propto_scale', 'constant_alphas', 'eft_alphas_power_law', 'eft_gammas_power_law', 'eft_gammas_exponential', 'brans_dicke', 'galileon', 'glpv_galileon', 'cccg_exp', 'nKGB', 'quintessence_monomial', 'quintessence_tracker', 'alpha_attractor_canonical', 'alphas_table' ...");
 
   return _SUCCESS_;
 }
@@ -839,9 +854,26 @@ int gravity_models_expansion_properties_smg(
     // 	}
   }
 
+  if (strcmp(string1,"table") == 0) {
+    /* tabulated rho_smg(a)/rho_smg(a=1) [and w] (gravity_smg/tables_smg.c),
+       rescaled by Omega0_smg H0^2: closure is exact, no shooting is needed */
+    pba->expansion_model_smg = table;
+    flag2=_TRUE_;
+    pba->rho_evolution_smg=_FALSE_;
+    /* one placeholder entry, so that the generic tuning bookkeeping
+       (tuning_index_smg < parameters_size_smg) holds; it is never used */
+    pba->parameters_size_smg = 1;
+    class_alloc(pba->parameters_smg, sizeof(double), errmsg);
+    pba->parameters_smg[0] = 0.;
+    class_alloc(pba->expansion_table_smg, sizeof(struct expansion_table_smg), errmsg);
+    class_call(tables_smg_read_expansion(pfc, pba->expansion_table_smg, errmsg),
+               errmsg,
+               errmsg);
+  }
+
   class_test(flag2==_FALSE_,
              errmsg,
-             "could not identify expansion_model value, check that it is either lcdm, wowa, wowa_w, wede ...");
+             "could not identify expansion_model value, check that it is either lcdm, wowa, wowa_w, wede, table ...");
 
   return _SUCCESS_;
 }
@@ -1123,6 +1155,19 @@ int gravity_models_get_back_par_smg(
 
   }
 
+  else if (pba->expansion_model_smg == table){
+
+    double rho_over_rho0, w;
+
+    class_call(tables_smg_eval_expansion(pba, pba->expansion_table_smg, log(a), &rho_over_rho0, &w,
+                                         pba->error_message),
+               pba->error_message,
+               pba->error_message);
+
+    pvecback[pba->index_bg_rho_smg] = pba->Omega0_smg*pow(pba->H0,2)*rho_over_rho0;
+    pvecback[pba->index_bg_p_smg] = w*pvecback[pba->index_bg_rho_smg];
+  }
+
   else if (pba->expansion_model_smg == wede){
 
     //Doran-Robbers model astro-ph/0601544
@@ -1180,7 +1225,25 @@ int gravity_models_get_alphas_par_smg(
     delta_M2 = pvecback_B[pba->index_bi_delta_M2_smg];
   }
 
-  if (pba->gravity_model_smg == propto_omega) {
+  if (pba->gravity_model_smg == alphas_table) {
+
+    double alpha_K, alpha_B, alpha_T, M2, alpha_M;
+
+    class_call(tables_smg_eval_alphas(pba, pba->alphas_table_smg, log(a),
+                                      &alpha_K, &alpha_B, &alpha_T, &M2, &alpha_M,
+                                      pba->error_message),
+               pba->error_message,
+               pba->error_message);
+
+    pvecback[pba->index_bg_kineticity_smg] = alpha_K;
+    pvecback[pba->index_bg_braiding_smg] = alpha_B;
+    pvecback[pba->index_bg_tensor_excess_smg] = alpha_T;
+    pvecback[pba->index_bg_M2_running_smg] = alpha_M;
+    pvecback[pba->index_bg_delta_M2_smg] = M2 - 1.;
+    pvecback[pba->index_bg_M2_smg] = M2;
+  }
+
+  else if (pba->gravity_model_smg == propto_omega) {
 
     double c_k = pba->parameters_2_smg[0];
     double c_b = pba->parameters_2_smg[1];
@@ -1786,6 +1849,12 @@ int gravity_models_print_stdout_smg(
 	      pba->parameters_2_smg[0],pba->parameters_2_smg[1],pba->parameters_2_smg[2],pba->parameters_2_smg[3],pba->parameters_2_smg[4],pba->parameters_2_smg[5],pba->parameters_2_smg[6],pba->parameters_2_smg[7]);
     break;
 
+    case alphas_table:
+      printf("Modified gravity: alphas_table with %d nodes, ln a in [%g, %g] \n",
+        pba->alphas_table_smg->spl.n, pba->alphas_table_smg->spl.lna[0],
+        pba->alphas_table_smg->spl.lna[pba->alphas_table_smg->spl.n-1]);
+    break;
+
     default:
       printf("Modified gravity: output not implemented in gravity_models_print_stdout_smg() \n");
   }
@@ -1813,6 +1882,12 @@ int gravity_models_print_stdout_smg(
       case wede:    //ILSWEDE
         printf("Parameterized model with variable EoS + Early DE \n");
         printf("-> Omega_smg = %f, w = %f, Omega_e = %f \n",pba->parameters_smg[0],pba->parameters_smg[1],pba->parameters_smg[2]);
+      break;
+
+      case table:
+        printf("Parameterized model with tabulated expansion (%d nodes%s) \n",
+          pba->expansion_table_smg->spl.n, pba->expansion_table_smg->has_w == _TRUE_ ? ", with w" : "");
+        printf("-> Omega_smg = %f \n",pba->Omega0_smg);
       break;
 
       default:
